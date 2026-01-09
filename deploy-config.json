@@ -1,0 +1,7 @@
+{
+    "repo_url": "https://github.com/kkekekeco/agent-based-on-fast-api",
+    "service_name": "agent-based-on-fast-api",
+    "branch": "main",
+    "port": 8000,
+    "env_vars": {}
+}
