@@ -2,6 +2,23 @@
 
 A FastAPI application featuring agentic AI chat capabilities with web search tools.
 
+## Screenshots
+
+### Chat Interface
+A modern, clean chat interface with quick action buttons.
+
+![Chat Interface](docs/images/chat_interface.png)
+
+### AI Agent in Action
+The agent uses web search to find real-time information and provides detailed responses with citations.
+
+![Chat Demo](docs/images/chat_demo.png)
+
+### Multiple Model Support
+Switch between different AI models including grok-4-fast, deepseek, gemini-2.5-pro, and gpt-5.
+
+![Model Switcher](docs/images/model_switcher.png)
+
 ## Features
 
 - 🤖 **Agentic Chat**: AI-powered chat using multiple LLM models (grok-4-fast, deepseek, gemini-2.5-pro, gpt-5, etc.)
