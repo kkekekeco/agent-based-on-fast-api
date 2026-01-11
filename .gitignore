@@ -42,3 +42,7 @@ debug.log
 
 # Test files
 test_*.py
+
+# Index files (from doc-retrival, contains personal notes)
+../202601-doc-retrival/*.index
+../202601-doc-retrival/*_metadata.json

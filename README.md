@@ -24,6 +24,7 @@ Switch between different AI models including grok-4-fast, deepseek, gemini-2.5-p
 - 🤖 **Agentic Chat**: AI-powered chat using multiple LLM models (grok-4-fast, deepseek, gemini-2.5-pro, gpt-5, etc.)
 - 🔍 **Web Search Tool**: Real-time web search integration via AI Builder Search API
 - 📄 **Page Reader Tool**: Fetch and extract content from web pages
+- 📚 **Personal Notes Search**: `query_my_notes` tool for searching your indexed personal knowledge base
 - 🎨 **Modern UI**: Beautiful chat interface with model switcher and chat history
 - 🐳 **Docker Ready**: Includes Dockerfile for containerized deployment
 
@@ -81,6 +82,42 @@ fastapi dev main.py
 | GET | `/` | Chat UI |
 | GET | `/welcome/{name}` | Welcome message |
 | POST | `/agent/chat` | Agentic chat endpoint |
+| POST | `/admin/reload-index` | Reload notes index without restart |
+
+## Personal Notes Integration
+
+This FastAPI app integrates with the `202601-doc-retrival` project to enable searching your personal knowledge base.
+
+**Setup:**
+1. Build index using the indexer in `202601-doc-retrival` project
+2. Place index file at `../202601-doc-retrival/my_notes.index`
+3. The agent will automatically use `query_my_notes` tool when appropriate
+
+See [INDEX_UPDATE_GUIDE.md](./INDEX_UPDATE_GUIDE.md) for details on updating your knowledge base.
+
+## Mac Setup
+
+```bash
+# Clone repository
+git clone https://github.com/kkekeke/202601-fastapi.git
+cd 202601-fastapi
+
+# Setup
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+
+# Configure
+cp .env.example .env
+# Edit .env and add your AI_BUILDER_TOKEN
+
+# Ensure index exists (from 202601-doc-retrival project)
+# Should be at: ../202601-doc-retrival/my_notes.index
+
+# Run
+export AI_BUILDER_TOKEN="your-key"
+python -m uvicorn main:app --reload --host 127.0.0.1 --port 8000
+```
 
 ## Docker Deployment
 

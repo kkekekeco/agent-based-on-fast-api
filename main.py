@@ -17,12 +17,15 @@ import json
 import re
 import httpx
 from typing import List, Optional, Dict, Any
+from pathlib import Path
 from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from dotenv import load_dotenv
 from openai import OpenAI
+import faiss
+import numpy as np
 
 # Configure logging
 logging.basicConfig(
@@ -49,8 +52,18 @@ client = OpenAI(
 app = FastAPI(
     title="Agentic AI Welcome API",
     description="A FastAPI app with user welcome and agentic search capabilities using internal Search API.",
-    version="3.0.0"
+    version="4.0.0"
 )
+
+# Load notes index at startup
+@app.on_event("startup")
+async def startup_event():
+    """Load the notes index when the application starts."""
+    index_path = Path(__file__).parent.parent / "202601-doc-retrival" / "my_notes.index"
+    if load_notes_index(str(index_path)):
+        logger.info("Notes index loaded successfully")
+    else:
+        logger.warning("Notes index not available - query_my_notes tool will not work")
 
 # Mount static files
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -146,6 +159,116 @@ def read_page(url: str) -> str:
         logger.error(error_msg)
         return error_msg
 
+# Global variables for notes index (loaded once at startup)
+_notes_index = None
+_notes_metadata = None
+_notes_dimension = None
+
+def load_notes_index(index_path: str = "../202601-doc-retrival/my_notes.index"):
+    """
+    Load the FAISS index and metadata for personal notes.
+    This is called once at startup.
+    
+    Args:
+        index_path: Path to the index file
+    """
+    global _notes_index, _notes_metadata, _notes_dimension
+    
+    try:
+        index_file = Path(index_path)
+        if not index_file.exists():
+            logger.warning(f"Notes index not found at {index_path}")
+            return False
+        
+        # Load FAISS index
+        _notes_index = faiss.read_index(str(index_file))
+        _notes_dimension = _notes_index.d
+        
+        # Load metadata
+        metadata_path = index_file.parent / index_file.name.replace('.index', '_metadata.json')
+        if metadata_path.exists():
+            with open(metadata_path, 'r', encoding='utf-8') as f:
+                metadata = json.load(f)
+                _notes_metadata = metadata.get('chunks', [])
+        else:
+            logger.warning(f"Metadata file not found at {metadata_path}")
+            _notes_metadata = []
+        
+        logger.info(f"Loaded notes index: {_notes_index.ntotal} vectors, {len(_notes_metadata)} chunks")
+        return True
+    except Exception as e:
+        logger.error(f"Failed to load notes index: {e}")
+        return False
+
+def query_my_notes(query: str, top_k: int = 5) -> str:
+    """
+    Search the personal knowledge base (my_notes.index) using vector similarity.
+    This tool acts as a research assistant for the user's personal notes.
+    
+    Args:
+        query: The search query string to find relevant notes
+        top_k: Number of top results to return (default: 5)
+        
+    Returns:
+        JSON string containing relevant note chunks with their sources and similarity scores
+    """
+    global _notes_index, _notes_metadata, _notes_dimension
+    
+    if _notes_index is None or _notes_metadata is None:
+        return json.dumps({
+            "error": "Notes index not loaded. Please ensure my_notes.index exists.",
+            "results": []
+        })
+    
+    logger.info(f"Querying notes index: '{query}' (top_k={top_k})")
+    
+    try:
+        # Get query embedding
+        response = client.embeddings.create(
+            model="text-embedding-ada-002",
+            input=[query]
+        )
+        query_embedding = np.array([response.data[0].embedding], dtype='float32')
+        
+        # Normalize for cosine similarity
+        faiss.normalize_L2(query_embedding)
+        
+        # Search
+        scores, indices = _notes_index.search(query_embedding, top_k)
+        
+        # Retrieve results
+        results = []
+        for score, idx in zip(scores[0], indices[0]):
+            if idx < len(_notes_metadata):
+                chunk = _notes_metadata[idx]
+                results.append({
+                    "text": chunk.get('text', ''),
+                    "file": chunk.get('file', ''),
+                    "score": float(score),
+                    "metadata": {
+                        "start": chunk.get('start', 0),
+                        "end": chunk.get('end', 0)
+                    }
+                })
+        
+        # Format results as JSON string
+        result_data = {
+            "query": query,
+            "results_count": len(results),
+            "results": results
+        }
+        
+        logger.info(f"Found {len(results)} relevant notes")
+        return json.dumps(result_data, ensure_ascii=False, indent=2)
+        
+    except Exception as e:
+        error_msg = f"Error querying notes: {str(e)}"
+        logger.error(error_msg)
+        return json.dumps({
+            "error": error_msg,
+            "results": []
+        })
+
 # Tool definitions for the LLM
 tools = [
     {
@@ -181,6 +304,28 @@ tools = [
                 "required": ["url"]
             }
         }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "query_my_notes",
+            "description": "Search the user's personal knowledge base (personal notes and documents). This is a research assistant tool for finding information from the user's indexed notes. Use this when the user asks questions that might be answered by their personal notes, documents, or knowledge base. You can call this tool multiple times with different queries to explore different aspects of a question. If initial results are not sufficient, refine your search queries based on what you learned.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "The search query to find relevant information in the personal notes. Formulate specific, targeted queries that match the user's question. You can use multiple queries to explore different angles."
+                    },
+                    "top_k": {
+                        "type": "integer",
+                        "description": "Number of top results to return (default: 5, max: 10)",
+                        "default": 5
+                    }
+                },
+                "required": ["query"]
+            }
+        }
     }
 ]
 
@@ -200,6 +345,27 @@ async def root():
     """
     return FileResponse("static/index.html")
 
+@app.post("/admin/reload-index")
+async def reload_index():
+    """
+    Reload the notes index without restarting the server.
+    Useful when you've updated the index file after adding new documents.
+    """
+    index_path = Path(__file__).parent.parent / "202601-doc-retrival" / "my_notes.index"
+    
+    if load_notes_index(str(index_path)):
+        return {
+            "status": "success",
+            "message": f"Index reloaded successfully. {_notes_index.ntotal} vectors, {len(_notes_metadata)} chunks loaded.",
+            "vectors": _notes_index.ntotal,
+            "chunks": len(_notes_metadata)
+        }
+    else:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Failed to reload index. Index file not found at {index_path}"
+        )
+
 @app.post("/agent/chat", response_model=ChatResponse)
 async def agent_chat(request: ChatRequest):
     """
@@ -208,11 +374,30 @@ async def agent_chat(request: ChatRequest):
     Uses `grok-4-fast` with the `web_search` tool.
     Loops up to max_turns times to handle multi-step reasoning.
     """
-    max_turns = 3
+    max_turns = 5  # Increased to allow for iterative note searches
     messages = [
         {
             "role": "system", 
-            "content": "You are a helpful AI assistant with access to web search. When you need to search, preserve as much detail from the user's original question as possible in your search query. If the user asks for specific information (like version numbers, breaking changes, or features), include those details in your search query."
+            "content": """You are a helpful AI assistant with access to multiple tools:
+
+1. **web_search**: For searching the internet for real-time information, news, or general facts. Use this for information not in the user's personal knowledge base.
+
+2. **read_page**: For reading specific web pages when you have a URL.
+
+3. **query_my_notes**: This is your research assistant tool for the user's PERSONAL KNOWLEDGE BASE. This tool searches through the user's indexed personal notes and documents.
+
+**IMPORTANT Guidelines for query_my_notes:**
+- When the user asks questions that might be answered by their personal notes, documents, or knowledge base, you should AUTONOMOUSLY use query_my_notes
+- Formulate targeted search queries that match the user's question. Think about what keywords or concepts would be in relevant notes
+- You can and should call query_my_notes MULTIPLE TIMES with different queries to explore different aspects of a question
+- If initial search results are not sufficient or don't fully answer the question, REFINE your search queries based on what you learned and try again
+- Combine information from multiple note searches to provide comprehensive answers
+- When you find relevant information in the notes, cite the source files in your response
+
+**Workflow:**
+- For questions about the user's personal information, projects, notes, or documents: Start with query_my_notes
+- If notes don't have the answer or you need current/public information: Use web_search
+- Always preserve detail from the user's original question in your search queries"""
         },
         {
             "role": "user", 
@@ -273,6 +458,21 @@ async def agent_chat(request: ChatRequest):
                         tool_output = read_page(url)
                         # Truncate for display
                         display_output = tool_output[:200] + "..." if len(tool_output) > 200 else tool_output
+                        print(f"[System] Tool Output (truncated): {display_output}")
+                        
+                        messages.append({
+                            "role": "tool",
+                            "tool_call_id": tc.id,
+                            "name": function_name,
+                            "content": tool_output
+                        })
+                    elif function_name == "query_my_notes":
+                        query = function_args.get("query", "")
+                        top_k = function_args.get("top_k", 5)
+                        print(f"[Agent] -> Tool: '{function_name}' | Query: '{query}' | top_k: {top_k}")
+                        tool_output = query_my_notes(query, top_k)
+                        # Truncate for display
+                        display_output = tool_output[:300] + "..." if len(tool_output) > 300 else tool_output
                         print(f"[System] Tool Output (truncated): {display_output}")
                         
                         messages.append({
