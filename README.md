@@ -93,7 +93,11 @@ This FastAPI app integrates with the `202601-doc-retrival` project to enable sea
 2. Place index file at `../202601-doc-retrival/my_notes.index`
 3. The agent will automatically use `query_my_notes` tool when appropriate
 
-See [INDEX_UPDATE_GUIDE.md](./INDEX_UPDATE_GUIDE.md) for details on updating your knowledge base.
+**Update Index:**
+When you add new files to `../202601-doc-retrival/docs/`, rebuild the index:
+- Windows: `cd ../202601-doc-retrival && .\refresh_index.ps1`
+- Mac/Linux: `cd ../202601-doc-retrival && ./refresh_index.sh`
+- Or manually: `python indexer.py` then call `/admin/reload-index` endpoint
 
 ## Mac Setup
 
