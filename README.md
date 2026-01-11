@@ -1,6 +1,10 @@
-# Agent-Based FastAPI Chat Application
+# Agent-Based FastAPI Chat Application (Monorepo)
 
 A FastAPI application featuring agentic AI chat capabilities with web search tools.
+
+**Monorepo Structure:**
+- `main.py` - FastAPI application with agentic chat
+- `doc-retrival/` - Document indexing and retrieval system for personal knowledge base
 
 ## Screenshots
 
@@ -86,18 +90,18 @@ fastapi dev main.py
 
 ## Personal Notes Integration
 
-This FastAPI app integrates with the `202601-doc-retrival` project to enable searching your personal knowledge base.
+This FastAPI app integrates with the `doc-retrival` subdirectory to enable searching your personal knowledge base.
 
 **Setup:**
-1. Build index using the indexer in `202601-doc-retrival` project
-2. Place index file at `../202601-doc-retrival/my_notes.index`
+1. Build index using the indexer in `doc-retrival` subdirectory
+2. Place index file at `doc-retrival/my_notes.index`
 3. The agent will automatically use `query_my_notes` tool when appropriate
 
 **Update Index:**
-When you add new files to `../202601-doc-retrival/docs/`, rebuild the index:
-- Windows: `cd ../202601-doc-retrival && .\refresh_index.ps1`
-- Mac/Linux: `cd ../202601-doc-retrival && ./refresh_index.sh`
-- Or manually: `python indexer.py` then call `/admin/reload-index` endpoint
+When you add new files to `doc-retrival/docs/`, rebuild the index:
+- Windows: `cd doc-retrival && .\refresh_index.ps1`
+- Mac/Linux: `cd doc-retrival && ./refresh_index.sh`
+- Or manually: `python doc-retrival/indexer.py` then call `/admin/reload-index` endpoint
 
 ## Mac Setup
 
@@ -115,8 +119,8 @@ pip install -r requirements.txt
 cp .env.example .env
 # Edit .env and add your AI_BUILDER_TOKEN
 
-# Ensure index exists (from 202601-doc-retrival project)
-# Should be at: ../202601-doc-retrival/my_notes.index
+# Ensure index exists (from doc-retrival subdirectory)
+# Should be at: doc-retrival/my_notes.index
 
 # Run
 export AI_BUILDER_TOKEN="your-key"

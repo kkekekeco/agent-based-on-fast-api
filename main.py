@@ -59,7 +59,7 @@ app = FastAPI(
 @app.on_event("startup")
 async def startup_event():
     """Load the notes index when the application starts."""
-    index_path = Path(__file__).parent.parent / "202601-doc-retrival" / "my_notes.index"
+    index_path = Path(__file__).parent / "doc-retrival" / "my_notes.index"
     if load_notes_index(str(index_path)):
         logger.info("Notes index loaded successfully")
     else:
@@ -164,7 +164,7 @@ _notes_index = None
 _notes_metadata = None
 _notes_dimension = None
 
-def load_notes_index(index_path: str = "../202601-doc-retrival/my_notes.index"):
+def load_notes_index(index_path: str = "doc-retrival/my_notes.index"):
     """
     Load the FAISS index and metadata for personal notes.
     This is called once at startup.
@@ -351,7 +351,7 @@ async def reload_index():
     Reload the notes index without restarting the server.
     Useful when you've updated the index file after adding new documents.
     """
-    index_path = Path(__file__).parent.parent / "202601-doc-retrival" / "my_notes.index"
+    index_path = Path(__file__).parent / "doc-retrival" / "my_notes.index"
     
     if load_notes_index(str(index_path)):
         return {

@@ -1,0 +1,12 @@
+# FAISS-based RAG Pipeline Requirements
+# Using AI Builder Space APIs for embeddings and LLM
+
+# Vector search
+faiss-cpu>=1.7.4
+# For GPU acceleration (optional): faiss-gpu>=1.7.4
+
+# OpenAI-compatible API client
+openai>=1.0.0
+
+# NumPy for array operations
+numpy>=1.24.0
