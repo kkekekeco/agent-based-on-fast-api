@@ -6,6 +6,8 @@ A FastAPI application featuring agentic AI chat capabilities with web search too
 - `main.py` - FastAPI application with agentic chat
 - `doc-retrival/` - Document indexing and retrieval system for personal knowledge base
 
+> 📋 **Migrating from Windows to Mac?** See [MAC_MIGRATION_NOTES.md](./MAC_MIGRATION_NOTES.md) for setup instructions.
+
 ## Screenshots
 
 ### Chat Interface
